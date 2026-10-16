@@ -1,4 +1,4 @@
-﻿
+
 // TaiJiView.h: CTaiJiView 类的接口
 //
 
@@ -37,9 +37,14 @@ public:
 #endif
 
 protected:
+	int m_angle;      // 当前旋转角度（度）
+	UINT_PTR m_timerId;
 
 // 生成的消息映射函数
 protected:
+	afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);
+	afx_msg void OnDestroy();
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnFilePrintPreview();
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);

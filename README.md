@@ -2,12 +2,21 @@
 
 用 **MFC** 在 Windows 上绘制并旋转「太极阴阳鱼」的小示例（Visual Studio 2019）。
 
-> 学习 / 演示项目：核心改动在 `TaiJiView` 的绘制逻辑；其余多为 MFC 应用程序向导生成的框架代码。
+> 学习 / 演示项目：核心改动在 `TaiJiView` 的绘制与定时器动画；其余多为 MFC 应用程序向导生成的框架代码。
 
-## 效果
+## 效果预览
 
-- 在客户区中心绘制黑白阴阳鱼
-- 通过角度递增实现连续旋转动画
+![太极旋转预览](docs/preview.gif)
+
+上图由与 `DrawObject` 相同的几何算法生成（半圆 `Pie` + 鱼头/鱼眼 `Ellipse`），便于在 GitHub 上直接查看。**真实可执行程序仍需 Windows + Visual Studio + MFC**，本仓库无法在 macOS / Linux 上直接跑 `.exe`。
+
+静态帧见 [`docs/preview.png`](docs/preview.png)。
+
+## 动画实现
+
+- `OnCreate` 中 `SetTimer`（约 16ms，~60fps）驱动旋转
+- `OnTimer` 递增角度并 `Invalidate`，由 `OnDraw` 双缓冲绘制当前帧
+- **不再**在 `OnDraw` 里用 `Sleep` 死循环（旧写法会卡住 UI 消息泵）
 
 ## 环境要求
 
@@ -26,16 +35,12 @@
 
 | 文件 | 作用 |
 |------|------|
-| `TaiJiView.cpp` / `TaiJiView.h` | **主要自定义代码**：`OnDraw`、`DrawObject` 绘制与旋转 |
+| `TaiJiView.cpp` / `TaiJiView.h` | **主要自定义代码**：`OnDraw`、`DrawObject`、`OnTimer` |
+| `docs/preview.gif` | 算法匹配的旋转预览 |
 | `TaiJi.sln` / `TaiJi.vcxproj` | Visual Studio 解决方案与工程 |
 | 其余 `*.cpp` / `*.h` / `res/` | MFC 多文档界面框架与资源（向导生成） |
 
-绘制使用 `Pie` / `Ellipse` 组合阴阳鱼形状；`OnDraw` 内用内存 DC 双缓冲，再按角度循环刷新。
-
-## 已知限制
-
-- 动画循环写在 `OnDraw` 里并用 `Sleep` 延时，会卡住 UI 消息泵；更规范的做法是用定时器（`SetTimer` / `OnTimer`）驱动重绘。本仓库保持原学习版逻辑，便于对照教材。
-- 仅支持 Windows + MFC，无法在 macOS / Linux 直接运行。
+绘制使用 `Pie` / `Ellipse` 组合阴阳鱼形状；白半圆刷子选择与实心白鱼头/白鱼眼已按意图修正。
 
 ## 许可证
 

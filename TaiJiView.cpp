@@ -1,4 +1,4 @@
-﻿
+
 // TaiJiView.cpp: CTaiJiView 类的实现
 //
 
@@ -20,6 +20,9 @@
 #define Round(d) int(floor(d+0.5))
 #define PI 3.1415926
 
+static const UINT_PTR kTaiJiTimerId = 1;
+static const UINT kTaiJiTimerMs = 16; // ~60fps
+
 
 // CTaiJiView
 
@@ -32,14 +35,17 @@ BEGIN_MESSAGE_MAP(CTaiJiView, CView)
 	ON_COMMAND(ID_FILE_PRINT_PREVIEW, &CTaiJiView::OnFilePrintPreview)
 	ON_WM_CONTEXTMENU()
 	ON_WM_RBUTTONUP()
+	ON_WM_CREATE()
+	ON_WM_DESTROY()
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 // CTaiJiView 构造/析构
 
 CTaiJiView::CTaiJiView() noexcept
+	: m_angle(0)
+	, m_timerId(0)
 {
-	// TODO: 在此处添加构造代码
-
 }
 
 CTaiJiView::~CTaiJiView()
@@ -54,6 +60,35 @@ BOOL CTaiJiView::PreCreateWindow(CREATESTRUCT& cs)
 	return CView::PreCreateWindow(cs);
 }
 
+int CTaiJiView::OnCreate(LPCREATESTRUCT lpCreateStruct)
+{
+	if (CView::OnCreate(lpCreateStruct) == -1)
+		return -1;
+
+	m_timerId = SetTimer(kTaiJiTimerId, kTaiJiTimerMs, NULL);
+	return 0;
+}
+
+void CTaiJiView::OnDestroy()
+{
+	if (m_timerId != 0)
+	{
+		KillTimer(m_timerId);
+		m_timerId = 0;
+	}
+	CView::OnDestroy();
+}
+
+void CTaiJiView::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent == kTaiJiTimerId)
+	{
+		m_angle = (m_angle + 2) % 360;
+		Invalidate(FALSE);
+	}
+	CView::OnTimer(nIDEvent);
+}
+
 // CTaiJiView 绘图
 
 void CTaiJiView::OnDraw(CDC* pDC)
@@ -62,33 +97,22 @@ void CTaiJiView::OnDraw(CDC* pDC)
 	ASSERT_VALID(pDoc);
 	if (!pDoc)
 		return;
+
 	CRect rect;
 	GetClientRect(&rect);
-	pDC->SetMapMode(MM_ANISOTROPIC);
-	pDC->SetWindowExt(rect.Width(), rect.Height());
-	pDC->SetViewportExt(rect.Width(), -rect.Height());
-	pDC->SetViewportOrg(rect.Width() / 2, rect.Height() / 2);
 
+	// 双缓冲：一次绘制当前角度帧，由 OnTimer 驱动旋转
 	CDC memDC;
-	CBitmap bm, * BM;
+	CBitmap bm;
 	memDC.CreateCompatibleDC(pDC);
 	bm.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
-	BM = memDC.SelectObject(&bm);
-	memDC.FillSolidRect(rect, pDC->GetBkColor());
-	rect.OffsetRect(-rect.Width() / 2, -rect.Height() / 2);
-	memDC.SetMapMode(MM_ANISOTROPIC);
-	memDC.SetWindowExt(rect.Width(), rect.Height());
-	memDC.SetViewportExt(rect.Width(), -rect.Height());
-	memDC.SetViewportExt(rect.Width() / 2, rect.Height() / 2);
-	for (int i = 0; i < 360 || i == 360; i++) {
-		Sleep(3);
-		DrawObject(&memDC, -i);
-		pDC->BitBlt(rect.left, rect.top, rect.Width(), rect.Height(), &memDC, -rect.Width() / 2, -rect.Height() / 2, SRCCOPY);
-		if (i == 360) { i = 0; }
-	}
-	memDC.SelectObject(BM);
+	CBitmap* pOldBm = memDC.SelectObject(&bm);
 
-	// TODO: 在此处为本机数据添加绘制代码
+	memDC.FillSolidRect(rect, pDC->GetBkColor());
+	DrawObject(&memDC, -m_angle);
+	pDC->BitBlt(0, 0, rect.Width(), rect.Height(), &memDC, 0, 0, SRCCOPY);
+
+	memDC.SelectObject(pOldBm);
 }
 
 void CTaiJiView::DrawObject(CDC* pDC, int i) {
@@ -126,7 +150,7 @@ void CTaiJiView::DrawObject(CDC* pDC, int i) {
 	//半白圆
 	COLORREF color2 = RGB(255, 255, 255);
 	brush2.CreateSolidBrush(color2);
-	Brush = pDC->SelectObject(&brush1);
+	Brush = pDC->SelectObject(&brush2); // 原代码误选 brush1，已修正
 	pDC->Pie(CRect(point1, point2), point3, point4);
 	pDC->SelectObject(Brush);
 	brush2.DeleteObject();
@@ -142,28 +166,28 @@ void CTaiJiView::DrawObject(CDC* pDC, int i) {
 	pDC->Ellipse(m1, n1, m2, n2);
 	pDC->SelectObject(Brush);
 	brush3.DeleteObject();
-	//白鱼头
+	//白鱼头（实心白刷，原版仅用白笔为空心）
 	m1 = Round(R2 * cos((i + 90) * PI / 180) - R2);
 	n1 = Round(R2 * sin((i + 90) * PI / 180) - R2);
 	m2 = Round(R2 * cos((i + 90) * PI / 180) + R2);
 	n2 = Round(R2 * sin((i + 90) * PI / 180) + R2);
-	CPen pen1, * Pen;
-	pen1.CreatePen(PS_SOLID, 1, color2);
-	Pen = pDC->SelectObject(&pen1);
+	CBrush brushWhiteHead;
+	brushWhiteHead.CreateSolidBrush(color2);
+	Brush = pDC->SelectObject(&brushWhiteHead);
 	pDC->Ellipse(m1, n1, m2, n2);
-	pDC->SelectObject(Pen);
-	pen1.DeleteObject();
-	//白鱼眼
+	pDC->SelectObject(Brush);
+	brushWhiteHead.DeleteObject();
+	//白鱼眼（实心）
 	m1 = Round(R2 * cos((i - 90) * PI / 180) - R3);
 	n1 = Round(R2 * sin((i - 90) * PI / 180) - R3);
 	m2 = Round(R2 * cos((i - 90) * PI / 180) + R3);
 	n2 = Round(R2 * sin((i - 90) * PI / 180) + R3);
-	CPen pen2;
-	pen2.CreatePen(PS_SOLID, 1, color2);
-	Pen = pDC->SelectObject(&pen2);
+	CBrush brushWhiteEye;
+	brushWhiteEye.CreateSolidBrush(color2);
+	Brush = pDC->SelectObject(&brushWhiteEye);
 	pDC->Ellipse(m1, n1, m2, n2);
-	pDC->SelectObject(Pen);
-	pen2.DeleteObject();
+	pDC->SelectObject(Brush);
+	brushWhiteEye.DeleteObject();
 	//黑鱼眼
 	m1 = Round(R2 * cos((i + 90) * PI / 180) - R3);
 	n1 = Round(R2 * sin((i + 90) * PI / 180) - R3);
